@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7f6">
+  <title>Voz Local · Texto a voz</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#guion" aria-label="Voz Local, ir a Texto a voz"><span class="brand-mark" aria-hidden="true">◖</span><span>Voz <strong>Local</strong></span></a>
+      <div class="side-heading" data-i18n="workspace">WORKSPACE</div>
+      <nav class="side-nav" aria-label="Secciones">
+        <a href="#guion" data-view="guion"><span aria-hidden="true">✎</span> <span data-i18n="textToSpeech">Text to speech</span></a>
+        <a href="#voces" data-view="voces"><span aria-hidden="true">◉</span> <span data-i18n="myVoices">My voices</span></a>
+        <a href="#proyecto" data-view="proyecto"><span aria-hidden="true">▦</span> <span data-i18n="projects">Projects</span></a>
+        <a href="#instalacion" data-view="instalacion"><span aria-hidden="true">↓</span> <span data-i18n="installation">Installation</span></a>
+      </nav>
+      <div class="side-bottom">
+        <div class="side-pulse" aria-hidden="true"></div>
+        <div><strong data-i18n="allOnYourComputer">Everything on your computer</strong><small data-i18n="localVoicesAndProjects">Local voices and projects</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <span data-i18n="voiceStudio">VOICE STUDIO</span>
+        <details class="system-details"><summary data-i18n="systemStatus">System status</summary><div class="status-pills">
+          <span id="gpu-status" class="pill" data-i18n="checkingGpu">Checking GPU…</span>
+          <span id="model-status" class="pill muted" data-i18n="checkingQwen">Checking Qwen3-TTS…</span>
+        </div></details>
+        <div class="language-picker"><label for="language-select" data-i18n="language">Language</label><select id="language-select" aria-label="Language"><option value="en">English</option><option value="es">Español</option></select></div>
+      </header>
+
+      <div class="content">
+        <div id="notice" class="notice" role="status" hidden></div>
+
+        <section id="voces" class="workspace-section">
+          <div class="section-title"><div><span class="section-index" data-i18n="voiceLibrary">VOICE LIBRARY</span><h1 data-i18n="myVoicesTitle">My voices</h1><p data-i18n="saveSampleForProjects">Save a sample to use it in all your projects.</p></div></div>
+          <details class="model-details"><summary data-i18n="technicalDetails">Technical details</summary><div class="voice-model-card" aria-live="polite">
+            <div class="voice-model-icon">◖</div>
+            <div class="voice-model-details">
+              <span class="panel-label" data-i18n="localModel">LOCAL MODEL</span>
+              <strong id="voice-model-name">Qwen3-TTS 1.7B Base</strong>
+              <p id="voice-model-description" data-i18n="checkingLocalInstallation">Checking local installation…</p>
+            </div>
+            <span id="voice-model-state" class="voice-model-state" data-i18n="checking">Checking…</span>
+          </div></details>
+          <div class="two-column">
+            <form id="voice-form" class="panel">
+              <h2 class="panel-heading" data-i18n="addVoice">Add voice</h2>
+              <p class="form-intro" data-i18n="voiceInstructions">Name your voice, write what you will say, then record it or upload the recording.</p>
+              <label for="voice-name" data-i18n="profileName">Profile name</label>
+              <input id="voice-name" name="name" type="text" maxlength="80" value="My voice" required>
+              <label for="voice-transcript" data-i18n="exactSampleText">Exact sample text</label>
+              <textarea id="voice-transcript" name="transcript" rows="3" maxlength="2000" data-i18n-placeholder="samplePlaceholder" placeholder="Write exactly what you are going to record or what can already be heard in the audio." required></textarea>
+              <p class="field-help" data-i18n="sampleHelp">The text must match everything you say exactly. Record in a quiet place; a 3 to 5 second sample usually works well.</p>
+              <div class="record-row">
+                <button id="record-button" class="button secondary" type="button" data-i18n="recordSample">● Record sample</button>
+                <button id="stop-button" class="button secondary" type="button" hidden data-i18n="stop">■ Stop</button>
+                <span id="record-timer" class="record-timer" aria-live="polite"></span>
+              </div>
+              <div class="upload-row"><label for="voice-file" class="upload-label"><span data-i18n="uploadAudio">Or upload an audio file</span> <span>↗</span></label><input id="voice-file" type="file" accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg"></div>
+              <audio id="record-preview" controls hidden></audio>
+              <button id="save-voice-button" class="button primary wide" type="submit"><span data-i18n="saveVoice">Save voice</span> <span>→</span></button>
+            </form>
+            <div class="panel library-panel"><h2 class="panel-heading" data-i18n="savedVoices">Saved voices</h2><div id="voice-list" class="voice-list"><p class="empty" data-i18n="profilesEmpty">Your profiles will appear here.</p></div></div>
+          </div>
+        </section>
+
+        <section id="guion" class="workspace-section">
+          <div class="section-title"><div><span class="section-index" data-i18n="createAudio">CREATE AUDIO</span><h1 data-i18n="textToSpeechTitle">Text to speech</h1><p data-i18n="writeScriptChooseVoice">Write your script, choose a voice and generate your narration.</p></div></div>
+          <ol class="quick-steps" aria-label="How it works" id="quick-steps">
+            <li><span class="step-number">1</span><div><strong data-i18n="stepVoice">Choose a voice</strong><small data-i18n="stepVoiceHelp">Add a recording in My voices first.</small></div></li>
+            <li><span class="step-number">2</span><div><strong data-i18n="stepText">Write your text</strong><small data-i18n="stepTextHelp">Paste the words you want to hear.</small></div></li>
+            <li><span class="step-number">3</span><div><strong data-i18n="stepAudio">Generate and download</strong><small data-i18n="stepAudioHelp">Continue, then press Generate audio.</small></div></li>
+          </ol>
+          <div class="writing-layout"><div class="panel script-panel">
+            <div class="script-top"><label for="script-text" data-i18n="yourText">Your text</label><span id="char-count" class="char-count">0 characters</span></div>
+            <textarea id="script-text" rows="9" maxlength="30000" data-i18n-placeholder="scriptPlaceholder" placeholder="Write the narration for your next video…"></textarea>
+            <details class="ollama-panel"><summary data-i18n="ollamaHelp">Writing help with Ollama</summary><div class="script-tools">
+              <div class="ollama-tool"><label for="ollama-model" data-i18n="localModelLabel">Local model</label><div class="ollama-fields"><select id="ollama-model"><option value="" data-i18n="searchingOllama">Searching Ollama…</option></select><select id="ollama-action" aria-label="Script editing"><option value="Mejora la claridad y naturalidad para narración en vídeo. Mantén todos los hechos y el tono original." data-i18n="improveNarration">Improve for narration</option><option value="Acorta el texto sin perder las ideas principales. Mantén un tono natural para vídeo." data-i18n="shortenScript">Shorten script</option><option value="Corrige ortografía y puntuación sin cambiar el contenido ni el estilo." data-i18n="correctText">Correct text</option></select></div></div>
+              <button id="rewrite-button" class="button secondary" type="button" data-i18n="editText">Edit text</button>
+            </div></details>
+          </div>
+          <form id="project-form" class="panel new-project-row">
+            <h2 class="panel-heading" data-i18n="prepareProject">Prepare project</h2>
+            <div id="first-voice-help" class="first-voice-help" hidden><p data-i18n="firstVoiceHelp">Start by adding a voice. You only need to do this once.</p><a class="button primary" href="#voces" data-i18n="addVoice">Add voice</a></div>
+            <div><label for="project-voice" data-i18n="voice">Voice</label><select id="project-voice" required><option value="" data-i18n="selectVoice">Select a voice</option></select><a class="inline-link" href="#voces"><span data-i18n="addVoiceLink">Add a voice</span> →</a></div>
+            <p class="field-help" data-i18n="continueHelp">Your text will be saved. On the next screen, press Generate audio.</p>
+            <details class="advanced-options"><summary data-i18n="advancedOptions">Advanced options</summary>
+            <div><label for="project-title" data-i18n="optionalProjectName">Project name (optional)</label><input id="project-title" maxlength="120" data-i18n-placeholder="projectNamePlaceholder" placeholder="E.g. Video introduction"></div>
+            <div><label for="project-voice-model" data-i18n="voiceModel">Voice model</label><select id="project-voice-model"><option value="qwen-1.7b" data-i18n="modelQuality">Qwen3-TTS 1.7B · Best quality</option><option value="qwen-0.6b" data-i18n="modelFast">Qwen3-TTS 0.6B · Faster</option><option value="qwen-0.6b-eco" data-i18n="modelEco">Qwen3-TTS 0.6B · Eco</option></select><p class="field-help" data-i18n="modelChooserHelp">The lighter options use less VRAM and usually generate faster.</p></div>
+            <fieldset class="project-mode-chooser"><legend data-i18n="scriptGenerationMode">How do you want to generate the script?</legend>
+              <label class="project-mode-option"><input type="radio" name="project-mode" value="continuous" checked><span><strong data-i18n="fullAudio">Full audio</strong><small data-i18n="fullAudioHelp">One script, player and file.</small></span></label>
+              <label class="project-mode-option"><input type="radio" name="project-mode" value="fragments"><span><strong data-i18n="fragments">By fragments</strong><small data-i18n="fragmentsHelp">Edit and regenerate each part separately.</small></span></label>
+            </fieldset>
+            </details>
+            <button class="button primary wide" type="submit"><span data-i18n="createProject">Create project</span> <span>→</span></button>
+          </form></div>
+        </section>
+
+        <section id="proyecto" class="workspace-section">
+          <div class="section-title"><div><span class="section-index" data-i18n="yourNarrations">YOUR NARRATIONS</span><h1 data-i18n="projectsTitle">Projects</h1><p data-i18n="playRegenerateDownload">Play, regenerate and download your audio.</p></div><a class="button secondary" href="#guion">+ <span data-i18n="newProject">New project</span></a></div>
+          <div class="production-grid">
+            <div class="panel project-list-panel"><h2 class="panel-heading" data-i18n="myProjects">My projects</h2><div id="project-list" class="project-list"><p class="empty" data-i18n="projectsEmpty">No projects yet.</p></div></div>
+            <div class="panel editor-panel"><div id="project-empty" class="editor-empty"><div class="empty-art">♫</div><h3 data-i18n="studioReady">Your studio is ready</h3><p data-i18n="createProjectToSee">Create a project to see its script and audio here.</p></div><div id="project-editor" hidden>
+              <div class="editor-header"><div><span class="panel-label" data-i18n="currentProject">CURRENT PROJECT</span><h3 id="selected-project-title"></h3><p id="selected-project-meta"></p></div><div class="editor-actions"><button id="generate-all" class="button primary" type="button" data-i18n="generatePending">Generate pending</button></div></div>
+              <p id="editor-guide" class="editor-guide"></p>
+              <details class="mode-details"><summary data-i18n="changeMode">Change mode</summary><div class="mode-controls"><label for="project-mode-switch" data-i18n="mode">Mode</label><select id="project-mode-switch"><option value="fragments" data-i18n="fragments">By fragments</option><option value="continuous" data-i18n="fullAudio">Full audio</option></select><button id="apply-project-mode" class="button secondary" type="button" data-i18n="changeMode">Change mode</button></div></details>
+              <div id="generation-progress" class="progress-text" role="status"></div><div id="chunk-list" class="chunk-list"></div><div class="export-row"><span data-i18n="downloadAudio">Download audio</span><div class="export-controls"><button id="export-wav" class="button secondary" type="button">↓ WAV</button><button id="export-mp3" class="button secondary" type="button">↓ MP3</button></div></div>
+              <details id="voice-settings" class="voice-settings" aria-labelledby="voice-settings-title">
+                <summary class="settings-summary"><span><strong id="voice-settings-title" data-i18n="voiceSettings">Voice settings</strong><small data-i18n="voiceSettingsHelp">Stability, similarity, style and language</small></span><span class="summary-chevron" aria-hidden="true">⌄</span></summary>
+                <div class="settings-heading-actions"><button id="natural-preset" class="button secondary" type="button" data-i18n="naturalSound">↺ Natural sound</button><span id="settings-status" role="status"></span></div>
+                <div class="setting-language-row model-select-row"><label for="setting-model" data-i18n="voiceModel">Voice model</label><select id="setting-model"><option value="qwen-1.7b" data-i18n="modelQuality">Qwen3-TTS 1.7B · Best quality</option><option value="qwen-0.6b" data-i18n="modelFast">Qwen3-TTS 0.6B · Faster</option><option value="qwen-0.6b-eco" data-i18n="modelEco">Qwen3-TTS 0.6B · Eco</option></select></div>
+                <div class="settings-grid">
+                  <div class="setting-control"><div class="setting-title"><label for="setting-stability" data-i18n="stability">Stability</label><output id="setting-stability-value" for="setting-stability">50 %</output></div><div class="setting-ends"><span data-i18n="moreVariable">More variable</span><span data-i18n="moreStable">More stable</span></div><input id="setting-stability" type="range" min="0" max="100" step="1" value="50"></div>
+                  <div class="setting-control"><div class="setting-title"><label for="setting-similarity" data-i18n="similarity">Similarity</label><output id="setting-similarity-value" for="setting-similarity">Audio and text</output></div><div class="setting-ends"><span data-i18n="timbreOnly">Timbre only</span><span data-i18n="audioAndText">Audio and text</span></div><input id="setting-similarity" type="range" min="0" max="1" step="1" value="1"><p class="setting-help" data-i18n="similarityHelp">Audio and text uses the sample and its exact transcript to preserve speech more closely.</p></div>
+                  <div class="setting-control"><div class="setting-title"><label for="setting-style" data-i18n="styleExaggeration">Style exaggeration</label><output id="setting-style-value" for="setting-style">0 %</output></div><div class="setting-ends"><span data-i18n="none">None</span><span data-i18n="moreVariation">More variation</span></div><input id="setting-style" type="range" min="0" max="100" step="1" value="0"><p class="setting-help" data-i18n="styleHelp">Adjusts variation while generating; the effect can change between fragments.</p></div>
+                </div>
+                <div class="setting-switch-row"><label for="setting-language-override" data-i18n="languageOverride">Language override</label><input id="setting-language-override" class="setting-switch" type="checkbox"></div>
+                <div id="setting-language-row" class="setting-language-row" hidden><label for="setting-language" data-i18n="languageToGenerate">Language to generate</label><select id="setting-language"><option value="Spanish" data-i18n="spanish">Spanish</option><option value="English" data-i18n="english">English</option><option value="Auto" data-i18n="auto">Automatic</option></select></div>
+                <p class="settings-footnote" data-i18n="settingsFootnote">Narration uses Qwen's original audio at 1.00×, without effects. To hear changes to stability, similarity or style, press “Regenerate”.</p>
+              </details>
+            </div></div>
+          </div>
+        </section>
+        <section id="instalacion" class="workspace-section" hidden>
+          <div class="section-title"><div><h1 data-i18n="installation">Installation</h1><p data-i18n="installIntro">Set up Voz Local on another computer. Choose your operating system.</p></div></div>
+          <div class="install-overview panel">
+            <h2 data-i18n="installNeed">What do I need?</h2>
+            <p data-i18n="installNeedHelp">The web needs a local server, Python, FFmpeg and a downloaded Qwen3-TTS voice model. Ollama is optional and only helps with writing.</p>
+            <p class="install-note" data-i18n="installAvailability">The current installer is specific to Linux with the RX 9060 XT. A universal automatic installer is not available yet.</p>
+            <a class="button primary" href="/api/installation/download" download="Voz-Local.zip" data-i18n="downloadInstaller">Download project ZIP</a><p class="field-help" data-i18n="installerPackageHelp">Includes the app and launchers. Python and the voice model download on the destination computer. Your voices and projects are not included.</p>
+          </div>
+          <div class="install-tabs" role="tablist" aria-label="Operating system" id="install-tabs">
+            <button id="install-tab-linux" class="install-tab" type="button" role="tab" aria-selected="true" aria-controls="install-linux" data-install-os="linux">Linux</button>
+            <button id="install-tab-windows" class="install-tab" type="button" role="tab" aria-selected="false" aria-controls="install-windows" tabindex="-1" data-install-os="windows">Windows</button>
+            <button id="install-tab-mac" class="install-tab" type="button" role="tab" aria-selected="false" aria-controls="install-mac" tabindex="-1" data-install-os="mac">macOS</button>
+          </div>
+          <div id="install-linux" class="panel install-guide" role="tabpanel" aria-labelledby="install-tab-linux">
+            <div class="install-heading"><h2>Linux</h2><span class="install-badge" data-i18n="installAvailable">Installer available</span></div>
+            <p data-i18n="linuxScope">For the current Ubuntu + Radeon RX 9060 XT setup. Other GPUs and distributions need a different PyTorch setup.</p>
+            <ol class="install-steps">
+              <li><h3 data-i18n="installGetProject">Download and extract the project</h3><p data-i18n="installFolderHelp">Open a terminal in the extracted Voz Local folder. Keep it there: your voices and projects will be saved in its data folder.</p></li>
+              <li><h3 data-i18n="installRun">Run the installer</h3><pre><code>bash instalar-e-iniciar.sh</code></pre><p data-i18n="linuxInstallerDoes">It prepares Python, FFmpeg, dependencies and the voice model, then opens the web.</p></li>
+              <li><h3 data-i18n="installLaunch">Start the web</h3><p data-i18n="repeatLauncher">Use the same launcher next time. Completed dependencies and downloads are reused.</p><p data-i18n="installKeepTerminal">Keep this terminal open while you use the app. Press Ctrl+C to stop the server.</p><a class="inline-link" href="http://127.0.0.1:8765/">http://127.0.0.1:8765/ ↗</a></li>
+            </ol>
+          </div>
+          <div id="install-windows" class="panel install-guide" role="tabpanel" aria-labelledby="install-tab-windows" hidden>
+            <div class="install-heading"><h2>Windows</h2><span class="install-badge" data-i18n="installAvailable">Installer available</span></div>
+            <p class="install-note" data-i18n="windowsScope">Voz Local does not have a native Windows installer yet. The current Linux script is not a Windows installer.</p>
+            <ol class="install-steps">
+              <li><h3 data-i18n="installGetProject">Download and extract the project</h3><p data-i18n="extractAll">Extract the whole project, including the scripts folder. The launcher cannot run by itself.</p></li>
+              <li><h3 data-i18n="windowsRun">Double-click the launcher</h3><pre><code>Instalar e iniciar.bat</code></pre><p data-i18n="windowsAutomatic">It downloads a private Python 3.12 runtime if missing, installs FFmpeg using WinGet, prepares the dependencies and downloads the voice model. Windows may ask for installation permissions.</p><p data-i18n="windowsWinget">If WinGet is unavailable, install Microsoft's App Installer and run the .bat again. If FFmpeg was just installed, you may need to reopen the .bat to refresh PATH.</p><a class="inline-link" href="https://learn.microsoft.com/windows/package-manager/winget/" target="_blank" rel="noopener noreferrer">Microsoft WinGet ↗</a></li>
+              <li><h3 data-i18n="installLaunch">Start the web</h3><p data-i18n="repeatLauncher">Use the same launcher next time. Completed dependencies and downloads are reused.</p><p data-i18n="installKeepTerminal">Keep this terminal open while you use the app. Press Ctrl+C to stop the server.</p></li>
+            </ol>
+          </div>
+          <div id="install-mac" class="panel install-guide" role="tabpanel" aria-labelledby="install-tab-mac" hidden>
+            <div class="install-heading"><h2>macOS</h2><span class="install-badge" data-i18n="installAvailable">Installer available</span></div>
+            <p class="install-note" data-i18n="macScope">Voz Local does not have a macOS installer yet. The current installer uses AMD ROCm and cannot be used on a Mac.</p>
+            <ol class="install-steps">
+              <li><h3 data-i18n="installGetProject">Download and extract the project</h3><p data-i18n="extractAll">Extract the whole project, including the scripts folder. The launcher cannot run by itself.</p></li>
+              <li><h3 data-i18n="macRun">Open the Mac launcher</h3><pre><code>Instalar e iniciar.command</code></pre><p data-i18n="macAutomatic">It prepares Python 3.12 and installs FFmpeg with Homebrew, installing Homebrew from its official source if missing. It then prepares the dependencies and voice model. If the .command does not open, run the following in a terminal inside the project folder:</p><pre><code>bash instalar-e-iniciar.sh</code></pre></li>
+              <li><h3 data-i18n="installLaunch">Start the web</h3><p data-i18n="repeatLauncher">Use the same launcher next time. Completed dependencies and downloads are reused.</p><p data-i18n="installKeepTerminal">Keep this terminal open while you use the app. Press Ctrl+C to stop the server.</p></li>
+            </ol>
+          </div>
+          <div class="panel install-faq"><h2 data-i18n="installQuestions">Common questions</h2>
+            <details><summary data-i18n="installOllamaQuestion">Do I need Ollama?</summary><p data-i18n="installOllamaAnswer">No. Qwen3-TTS generates the voice directly. Install Ollama only if you want help editing scripts.</p><a class="inline-link" href="https://ollama.com/download" target="_blank" rel="noopener noreferrer" data-i18n="ollamaOfficial">Optional: download Ollama ↗</a></details>
+            <details><summary data-i18n="installInternetQuestion">Do I need internet every time?</summary><p data-i18n="installInternetAnswer">Internet is needed to install dependencies and download each model the first time. Once downloaded, voice generation is local. Selecting a model you do not have may trigger a download.</p></details>
+            <details><summary data-i18n="installBrowserQuestion">Why does the web not open?</summary><p data-i18n="installBrowserAnswer">The server must be running on the same computer as the browser. A localhost link alone does not install or start Voz Local. On this Ubuntu setup, run bash iniciar.sh again after restarting the computer.</p></details>
+            <details><summary data-i18n="installAutomaticQuestion">Will everything install automatically?</summary><p data-i18n="installAutomaticAnswer">The current Linux script installs the project environment and the 1.7B voice model. It requires FFmpeg and Python environment tools beforehand, and does not install system GPU drivers. Automatic Windows and macOS installers still need to be built.</p></details>
+            <p class="field-help"><span data-i18n="installSources">Voice model documentation:</span> <a href="https://github.com/QwenLM/Qwen3-TTS" target="_blank" rel="noopener noreferrer">Qwen3-TTS ↗</a></p>
+          </div>
+        </section>
+        <footer><span data-i18n="footerTitle">VOZ LOCAL</span> <span>·</span> <span data-i18n="footerText">Your voice studio on this computer</span></footer>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
