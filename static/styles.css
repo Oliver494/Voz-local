@@ -316,6 +316,6 @@ footer span { padding: 0 5px; }
 .desktop-progress { min-height:20px; }
 .desktop-error { padding:12px; background:#fff0f0; color:#9e3b3b!important; overflow-wrap:anywhere; white-space:pre-wrap; }
 .desktop-setup progress { width:100%; height:7px; accent-color:#333; }
-#dt-logs { max-height:360px; overflow:auto; padding:16px; background:#f6f6f5; font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; }
+#dt-logs,.desktop-log { max-height:360px; overflow:auto; padding:16px; background:#f6f6f5; font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; }
 #dt-model-folder-path,#dt-runtime { overflow-wrap:anywhere; }
 html[data-desktop] .topbar { -webkit-app-region:no-drag; }

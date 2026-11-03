@@ -64,7 +64,7 @@ print(json.dumps(info))
 """
     result = subprocess.run([str(python), '-c', probe], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     if result.returncode:
-        raise RuntimeError('PyTorch could not run. Choose CPU and retry. / Elige CPU y reintenta.\n' + result.stderr[-2000:])
+        raise RuntimeError('PyTorch could not run on this device. For GPU errors retry with CPU; for CPU errors check the diagnostic log. / PyTorch no funciona en este dispositivo. Si falla la GPU, reintenta con CPU; si ya usas CPU, revisa el diagnóstico.\n' + result.stderr[-2000:])
     marker.write_text(json.dumps({'requirements': fingerprint, 'profile': args.profile}))
     emit('model', 'Preparing voice model / Preparando modelo')
     env = dict(os.environ, VOZ_LOCAL_DATA_DIR=str(root), VOZ_LOCAL_DEFAULT_MODEL=args.model)

@@ -21,7 +21,7 @@
     <button type="button" class="button secondary" id="dt-model-folder"></button><p id="dt-model-folder-path" class="field-help"></p>
     <p id="dt-explanation" class="field-help"></p><p class="desktop-progress" id="dt-progress" role="status" aria-live="polite"></p>
     <progress id="dt-progress-bar" hidden></progress><p id="dt-error" class="desktop-error" role="alert" hidden></p>
-    <div class="desktop-setup-actions"><button class="button primary" type="button" id="dt-install"></button><button class="button secondary" type="button" id="dt-restart"></button><button class="button secondary" type="button" id="dt-later" hidden></button></div>
+    <div class="desktop-setup-actions"><button class="button primary" type="button" id="dt-install"></button><button class="button secondary" type="button" id="dt-restart"></button><button class="button secondary" type="button" id="dt-later" hidden></button><button class="button secondary" type="button" id="dt-setup-logs"></button></div><pre id="dt-setup-log-text" class="desktop-log" hidden></pre>
   </div>`;
   document.body.append(overlay);
   $('instalacion').innerHTML = `<div class="section-title"><div><h1 id="dt-settings-title"></h1><p id="dt-settings-subtitle"></p></div></div>
@@ -53,6 +53,7 @@
       'dt-import':['Import previous installation…','Importar instalación anterior…'],
       'dt-open-data':['Open data folder','Abrir carpeta de datos'],
       'dt-show-logs':['Show diagnostics','Ver diagnóstico'],
+      'dt-setup-logs':['Show diagnostics','Ver diagnóstico'],
       'dt-import-help':['Import requires an empty desktop library. Choose the old data folder. The original installation is kept; existing model weights are reused without copying them.','La importación requiere una biblioteca de escritorio vacía. Elige la carpeta data anterior. Se conserva la instalación original y se reutilizan los modelos sin copiarlos.'],
       'dt-choose-sample':['Upload audio…','Subir audio…']
     };
@@ -107,6 +108,7 @@
   $('dt-model').onchange=size;
   $('dt-model-folder').onclick=async()=>{try{const path=await invoke('choose_models');if(path)$('dt-model-folder-path').textContent=path;}catch(e){fail(e);}};
   $('dt-open-data').onclick=()=>invoke('open_data').catch(e=>{$('dt-settings-status').textContent=String(e);});
+  $('dt-setup-logs').onclick=async()=>{try{$('dt-setup-log-text').textContent=await invoke('diagnostics');$('dt-setup-log-text').hidden=false;}catch(e){fail(e);}};
   $('dt-show-logs').onclick=async()=>{try{$('dt-logs').textContent=await invoke('diagnostics');$('dt-logs').hidden=false;}catch(e){$('dt-settings-status').textContent=String(e);}};
   $('dt-import').onclick=async()=>{if(working)return;working=true;$('dt-import').disabled=true;try{if(await invoke('import_legacy')){$('dt-settings-status').textContent=text('Imported. Your original installation is unchanged.','Importado. La instalación original se conserva.');document.dispatchEvent(new Event('desktop-engine-ready'));await refresh();}}catch(e){$('dt-settings-status').textContent=String(e);}finally{working=false;$('dt-import').disabled=false;}};
   choose.onclick=async()=>{try{const sample=await invoke('choose_sample');if(sample){bridge.sample=sample;$('dt-chosen-sample').textContent=sample.name;$('record-preview').src=bridge.media('/sample/'+sample.id);$('record-preview').hidden=false;}}catch(e){$('dt-chosen-sample').textContent=String(e);}};
