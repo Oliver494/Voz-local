@@ -9,7 +9,7 @@ Node.js installation is required from the user.
 
 Open Voz Local from its icon. The setup assistant lets you choose English/Spanish,
 CPU/NVIDIA CUDA/Linux RX 9060 XT ROCm, and Qwen3-TTS 1.7B or 0.6B. It downloads
-private Python 3.12, PyTorch, voice libraries and the selected model. The download
+private Python 3.12 (without registering system executables), PyTorch, voice libraries and the selected model. The download
 size is fetched from Hugging Face; dependencies require additional disk space.
 GPU drivers must already be compatible. If the GPU computation check fails, choose
 CPU and retry. CPU can be very slow. The assistant can reuse existing model weights
@@ -32,7 +32,7 @@ a native Save dialog and preserve the original Qwen audio at 1.00×.
 Settings offers engine setup/restart, data folder, diagnostics and library import.
 Import requires an empty desktop library: select the previous installation's `data`
 folder. The importer validates its SQLite database and recording paths, stages a
-copy, then installs it with rollback on failure. It does not delete or edit the
+copy, then installs it with rollback on failure and a journal recovered on the next startup after an interrupted commit. It does not delete or edit the
 original. Complete old model weights are referenced in place; missing models are
 downloaded into the new desktop data directory. Keep the original model folder
 available while using referenced weights. Samples and generated audio are copied.
@@ -47,7 +47,7 @@ previous audio. A crashed engine can be restarted from the assistant.
 - Tauri 2/Rust hosts the bundled HTML/CSS/JavaScript. No remote web content receives
   Tauri commands. External HTTP links open in the system browser.
 - Rust controls private Python as a supervised child, using process groups on Unix
-  and a kill-on-close Job Object on Windows. Python binds a free loopback port.
+  and a kill-on-close Job Object on Windows. Linux workers also monitor the desktop parent and terminate their own process group after a crash. Python binds a free loopback port.
 - A random per-session bearer token is sent through stdin and retained by Rust;
   it is not in URLs, frontend JavaScript, CLI arguments or access logs.
 - JavaScript calls limited desktop commands. Rust forwards authenticated JSON and
@@ -93,7 +93,9 @@ succeed. Packages are unsigned. No automatic updater is enabled in this preview.
 | Scenario | Current evidence |
 | --- | --- |
 | Rust/Tauri Linux compilation | `cargo check` succeeds on this Ubuntu host |
-| Python API regression | 13 tests: session auth, web compatibility, invalid audio, generation failure preservation, WAV/MP3 export, Range playback, legacy import rollback/path validation and external model reuse |
+| Python API regression | 15 Python tests (one Linux-only): session auth, web compatibility, invalid audio, generation failure preservation, WAV/MP3 export, Range playback, legacy import rollback/path validation and external model reuse |
+| Native full-flow Linux smoke | A real Tauri window reported UI → IPC → authenticated Python → SQLite → UI readiness; unauthenticated access returned 401 and the owned backend stopped when the app exited. Uses the existing interpreter as a read-only test reference, not a fresh installer validation. |
+| Fresh private runtime and offline reuse | Linux: bundled uv downloaded Python 3.12.16 into an isolated directory, installed CPU PyTorch/dependencies, reused complete 0.6B weights, passed an actual tensor operation, then completed setup offline without reinstalling. Real CPU generation/export produced 9.68 seconds of audio (53.84 seconds including load on this host). |
 | Native Rust guards | Test suite covers API path restrictions and active-operation accounting |
 | Windows/Linux installers | GitHub Actions builds each on its own OS; build results are recorded in the draft release |
 | Real GPU voice generation | Tested with 1.7B on this Linux AMD/ROCm host: 5.36-second original WAV, WAV/MP3 exports, authenticated sidecar and HTTP Range; sample file unchanged. Generation took 55.66 seconds including model load. Perceived voice quality still requires listening. |

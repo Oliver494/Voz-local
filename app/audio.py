@@ -4,6 +4,13 @@ import subprocess
 import os
 
 FFMPEG = os.environ.get("VOZ_LOCAL_FFMPEG", "ffmpeg")
+
+
+def _run(*args, **kwargs):
+    if os.name == "nt":
+        kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
+    return subprocess.run(*args, **kwargs)
+
 import wave
 import numpy as np
 
@@ -49,7 +56,7 @@ def normalize_reference(source: Path, destination: Path) -> float:
         "-i", str(source), "-vn", "-ac", "1", "-ar", "24000",
         "-c:a", "pcm_s16le", str(destination),
     ]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=90)
+    result = _run(command, capture_output=True, text=True, timeout=90)
     if result.returncode:
         raise ValueError("No pude leer el audio. Sube WAV, MP3, M4A u otro formato de audio válido.")
     info = sf.info(destination)
@@ -73,7 +80,7 @@ def process_generated_audio(samples, sample_rate: int, speed: float, effects: bo
             raise ValueError("Método de velocidad desconocido.")
     if effects:
         filters.extend(("highpass=f=70", "acompressor=threshold=0.125:ratio=2:attack=12:release=100:makeup=1"))
-    result = subprocess.run(
+    result = _run(
         [FFMPEG, "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "f32le",
          "-ar", str(sample_rate), "-ac", "1", "-i", "pipe:0", "-af", ",".join(filters),
          "-f", "f32le", "-ac", "1", "-ar", str(sample_rate), "pipe:1"],
@@ -106,7 +113,7 @@ def combine_wav(files: list[Path], destination: Path) -> None:
 
 
 def wav_to_mp3(source: Path, destination: Path) -> None:
-    result = subprocess.run(
+    result = _run(
         [FFMPEG, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
          "-i", str(source), "-codec:a", "libmp3lame", "-b:a", "192k", str(destination)],
         capture_output=True, text=True, timeout=180,

@@ -1,5 +1,7 @@
 """Private environment provisioning, structured progress, resumable model downloads."""
 import argparse
+if __name__ == "__main__":
+    import lifecycle
 import hashlib
 import json
 import os
@@ -15,8 +17,9 @@ def emit(phase, message, **extra):
     with PRINT_LOCK:
         print(json.dumps(dict(phase=phase, message=message, **extra)), flush=True)
 
-def run(args, **kwargs):
-    subprocess.run([str(a) for a in args], check=True, stdout=sys.stderr, **kwargs)
+def run(args, progress=False, **kwargs):
+    if os.name == "nt": kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
+    subprocess.run([str(a) for a in args], check=True, stdout=None if progress else sys.stderr, **kwargs)
 
 def install(args):
     root = Path(args.data).resolve()
@@ -59,13 +62,13 @@ assert float((x @ x)[0,0].cpu()) == 32.0
 if device != 'cpu': torch.cuda.synchronize()
 print(json.dumps(info))
 """
-    result = subprocess.run([str(python), '-c', probe], capture_output=True, text=True)
+    result = subprocess.run([str(python), '-c', probe], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     if result.returncode:
         raise RuntimeError('PyTorch could not run. Choose CPU and retry. / Elige CPU y reintenta.\n' + result.stderr[-2000:])
     marker.write_text(json.dumps({'requirements': fingerprint, 'profile': args.profile}))
     emit('model', 'Preparing voice model / Preparando modelo')
     env = dict(os.environ, VOZ_LOCAL_DATA_DIR=str(root), VOZ_LOCAL_DEFAULT_MODEL=args.model)
-    run([python, Path(__file__).resolve(), '--download', '--data', root, '--model', args.model], env=env)
+    run([python, Path(__file__).resolve(), '--download', '--data', root, '--model', args.model], env=env, progress=True)
     emit('ready', 'Motor preparado / Engine ready')
 
 def download(args):

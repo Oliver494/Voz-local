@@ -1,5 +1,7 @@
 """Import a legacy installation without modifying it; validate DB paths before commit."""
 import argparse
+if __name__ == "__main__":
+    import lifecycle
 import json
 import os
 from pathlib import Path
@@ -20,10 +22,34 @@ def closed_connection(*args, **kwargs):
 
 
 
+
+def recover_import(destination):
+    destination=Path(destination).resolve()
+    journal=destination/'import-journal.json'
+    if not journal.exists(): return
+    record=json.loads(journal.read_text())
+    name=record['backup']
+    if not name.startswith('.before-import-') or Path(name).name != name:
+        raise ValueError('Invalid import recovery journal')
+    backup=destination/name
+    for name in ('voices','projects','voz_local.sqlite3','desktop-settings.json'):
+        saved=backup/name;target=destination/name
+        if saved.exists():
+            if target.is_dir():shutil.rmtree(target)
+            else:target.unlink(missing_ok=True)
+            os.replace(saved,target)
+        elif name not in record['had_old']:
+            if target.is_dir():shutil.rmtree(target)
+            else:target.unlink(missing_ok=True)
+    journal.unlink()
+    if backup.exists() and not any(backup.iterdir()):backup.rmdir()
+
+
 def import_data(source, destination):
     source, destination = Path(source).resolve(), Path(destination).resolve()
     if source == destination or source in destination.parents or destination in source.parents:
         raise ValueError('Choose a separate source data folder / Elige una carpeta de origen diferente.')
+    recover_import(destination)
     database = destination / 'voz_local.sqlite3'
     if database.exists():
         with closed_connection(database) as db:
@@ -66,6 +92,13 @@ def import_data(source, destination):
         # Stage completely before installing. Roll back destination on interrupted commit.
         backup = destination / ('.before-import-' + uuid.uuid4().hex)
         backup.mkdir()
+        config=destination/'desktop-settings.json'
+        had_old=[name for name in ('voices','projects','voz_local.sqlite3','desktop-settings.json') if (destination/name).exists()]
+        if config.exists():shutil.copy2(config,backup/'desktop-settings.json')
+        journal=destination/'import-journal.json'
+        with journal.open('w') as handle:
+            json.dump({'backup':backup.name,'had_old':had_old},handle)
+            handle.flush();os.fsync(handle.fileno())
         installed = []
         moved = []
         try:
@@ -85,13 +118,11 @@ def import_data(source, destination):
             temporary.write_text(json.dumps(settings))
             os.replace(temporary, config)
         except BaseException:
-            for name in installed:
-                target = destination / name
-                shutil.rmtree(target) if target.is_dir() else target.unlink(missing_ok=True)
-            for name in moved: os.replace(backup / name, destination / name)
+            recover_import(destination)
             raise
         finally:
             if backup.exists() and not any(backup.iterdir()): backup.rmdir()
+        journal.unlink(missing_ok=True)
         # Keep the previous empty DB backup until the next import; never touch source.
         return {'imported': True, 'models_dir': settings.get('models_dir')}
     finally:
@@ -104,5 +135,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try: print(json.dumps(import_data(args.source, args.destination)))
     except Exception as error:
+        print(json.dumps({'phase':'error','message':str(error)}),flush=True)
         print(str(error), file=__import__('sys').stderr)
         raise SystemExit(1)

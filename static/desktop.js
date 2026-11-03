@@ -113,19 +113,20 @@
   bridge.request=async(path,options={})=> {
     try {
       if(options.body instanceof FormData && path==='/api/voices')return await invoke('upload_voice',{name:options.body.get('name'),transcript:options.body.get('transcript'),sampleId:bridge.sample?.id});
-      let timer;
+      let timer, stopped=false;
       const node=$('generation-progress'), previous=node?.textContent||'', start=Date.now();
       if(path.endsWith('/generate')) timer=setInterval(async()=>{
         try {
           const status=await invoke('api_request',{method:'GET',path:'/api/desktop/progress',body:null});
           const labels={loading:['Loading model','Cargando modelo'],downloading:['Downloading model','Descargando modelo'],generating:['Generating audio','Generando audio'],idle:['Preparing audio','Preparando audio']};
-          if(node)node.textContent=[previous,text(...(labels[status.phase]||labels.idle)),`${Math.floor((Date.now()-start)/1000)} s`].filter(Boolean).join(' · ');
+          if(!stopped && node)node.textContent=[previous,text(...(labels[status.phase]||labels.idle)),`${Math.floor((Date.now()-start)/1000)} s`].filter(Boolean).join(' · ');
         }catch{}
       },1000);
       try{return await invoke('api_request',{method:options.method||'GET',path,body:options.body?JSON.parse(options.body):null});}
-      finally{if(timer){clearInterval(timer);if(node)node.textContent=previous;}}
+      finally{stopped=true;if(timer){clearInterval(timer);if(node)node.textContent=previous;}}
     } catch(error) { throw new Error(typeof error==='string'?error:error.message||String(error)); }
   };
+  bridge.appReady=()=>invoke('ui_report',{kind:'ready',message:'Desktop project UI loaded from authenticated engine'});
   bridge.media=path=>info ? info.media_origin+path : path;
   bridge.export=async(project,format)=>{try{return await invoke('export_audio',{projectId:project.id,format,title:project.title});}catch(e){throw new Error(String(e));}};
   bridge.record=async(state,t,message)=> {

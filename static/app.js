@@ -152,7 +152,7 @@ const views = ["guion", "voces", "proyecto", "instalacion"];
 function showView() {
   const current = location.hash.slice(1);
   const view = views.includes(current) ? current : "guion";
-  document.title = `Voz Local · ${{ guion: t("textToSpeech"), voces: t("myVoices"), proyecto: t("projects"), instalacion: t("installation") }[view]}`;
+  document.title = `Voz Local · ${{ guion: t("textToSpeech"), voces: t("myVoices"), proyecto: t("projects"), instalacion: window.VozDesktop?.active ? (state.language === "es" ? "Ajustes" : "Settings") : t("installation") }[view]}`;
   for (const name of views) $(name).hidden = name !== view;
   document.querySelectorAll(".side-nav a[data-view]").forEach(link => {
     const active = link.dataset.view === view;
@@ -814,6 +814,7 @@ async function boot() {
   try {
     await Promise.all([loadStatus(), loadVoices(), loadProjects(), loadOllamaModels()]);
     if (state.projects.length) await openProject(state.projects[0].id);
+    await window.VozDesktop?.appReady?.();
   } catch (error) { message(t("startupError", { error: error.message }), true); }
 }
 $ ("language-select").addEventListener("change", () => {

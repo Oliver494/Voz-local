@@ -85,6 +85,7 @@ fn runtime_env(state: &Desktop, command: &mut Command) {
         .env("UV_NO_PROGRESS", "1")
         .env("VOZ_LOCAL_DATA_DIR", &state.root)
         .env("PYTHONUNBUFFERED", "1")
+        .env("VOZ_LOCAL_PARENT_PID", std::process::id().to_string())
         .env("TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL", "1");
     let ffmpeg = std::env::var_os("VOZ_LOCAL_FFMPEG")
         .map(PathBuf::from)
@@ -326,7 +327,7 @@ async fn prepare_engine(
         {let mut settings=state.settings.lock().unwrap();settings.profile=profile.clone();settings.model=model.clone();}
         let uv=binary(&state.resources,"uv");
         if !uv.is_file(){return Err("Bundled uv missing. Run resource preparation before building.".into());}
-        let mut python_install=Command::new(&uv);python_install.args(["python","install","3.12"]);
+        let mut python_install=Command::new(&uv);python_install.args(["python","install","--no-bin","--no-registry","3.12"]);
         report(&app,&state,json!({"phase":"python","message":"Downloading Python if needed / Preparando Python"}));
         run_progress(&app,&state,python_install)?;
         let mut setup=Command::new(&uv);
@@ -670,8 +671,8 @@ async fn import_legacy(app: tauri::AppHandle, state: State<'_>) -> Result<bool, 
         if !python(&state.root).is_file(){return Err("Prepare Python using the setup assistant first / Completa el asistente primero.".into());}
         stop_engine(&state);
         let mut command=Command::new(python(&state.root));runtime_env(&state,&mut command);
-        let output=command.arg(backend_script(&state,"import_data.py")).arg(file.into_path().map_err(error)?).arg(&state.root).output().map_err(error)?;
-        if !output.status.success(){let _=start_engine(&app,&state);return Err(String::from_utf8_lossy(&output.stderr).into_owned());}
+        command.arg(backend_script(&state,"import_data.py")).arg(file.into_path().map_err(error)?).arg(&state.root);
+        if let Err(e)=run_progress(&app,&state,command){let _=start_engine(&app,&state);return Err(e);}
         let settings:Settings=serde_json::from_slice(&fs::read(state.root.join("desktop-settings.json")).map_err(error)?).map_err(error)?;
         *state.settings.lock().unwrap()=settings;
         start_engine(&app,&state)?;Ok(true)
@@ -838,13 +839,39 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![desktop_info,prepare_engine,restart_engine,api_request,choose_sample,upload_voice,recording_start,recording_stop,export_audio,model_size,choose_models,import_legacy,open_external,open_data,diagnostics,ui_report])
         .setup(|app| {
-            let root=app.path().app_local_data_dir()?;
+            let root=if cfg!(debug_assertions){std::env::var_os("VOZ_LOCAL_DESKTOP_TEST_DIR").map(PathBuf::from).unwrap_or(app.path().app_local_data_dir()?)}else{app.path().app_local_data_dir()?};
             for folder in ["logs","tmp/recordings"] {fs::create_dir_all(root.join(folder))?;}
             // Only remove known uncommitted recording files; saved voices/projects are untouched.
             for entry in fs::read_dir(root.join("tmp/recordings"))?.flatten(){let path=entry.path();if path.extension().and_then(|e|e.to_str())==Some("wav"){let _=fs::remove_file(path);}}
             let resources=if cfg!(debug_assertions){PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")}else{app.path().resource_dir()?.join("resources")};
             let settings=fs::read(root.join("desktop-settings.json")).ok().and_then(|s|serde_json::from_slice(&s).ok()).unwrap_or_default();
             let state=Arc::new(Desktop{root,resources,settings:Mutex::new(settings),client:reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(15)).build()?,engine:Mutex::new(None),setup_process:Mutex::new(None),progress:Mutex::new(json!({"phase":"idle"})),samples:Mutex::new(HashMap::new()),recording:Mutex::new(None),preparing:AtomicBool::new(false),busy:AtomicUsize::new(0),closing:AtomicBool::new(false)});
+            let smoke_engine=std::env::args().any(|arg|arg=="--smoke-engine");
+            if smoke_engine || std::env::args().any(|arg|arg=="--smoke-startup") {
+                let handle=app.handle().clone();let state=state.clone();let log=state.root.join("logs/desktop.log");
+                std::thread::spawn(move|| {
+                    for _ in 0..240 {
+                        let contents=fs::read_to_string(&log).unwrap_or_default();
+                        let expected=if smoke_engine{"ready Desktop project UI loaded from authenticated engine"}else{"ready Desktop interface loaded and IPC connected"};
+                        if contents.contains(expected) {
+                            if smoke_engine {
+                                let base=state.engine.lock().unwrap().as_ref().map(|e|e.base.clone());
+                                if let Some(base)=base {
+                                    let denied=state.client.get(format!("{base}/api/voices")).timeout(Duration::from_secs(5)).send().map(|r|r.status().as_u16()==401).unwrap_or(false);
+                                    stop_engine(&state);
+                                    let stopped=state.client.get(format!("{base}/api/voices")).timeout(Duration::from_secs(2)).send().is_err();
+                                    if !denied || !stopped {eprintln!("Private engine shutdown/auth smoke failed");handle.exit(1);return;}
+                                    println!("NATIVE_UI_ENGINE_SQLITE_READY; AUTH_401; OWNED_PROCESS_STOPPED");
+                                }else{handle.exit(1);return;}
+                            }else{println!("NATIVE_UI_IPC_READY");}
+                            state.closing.store(true,Ordering::SeqCst);handle.exit(0);return;
+                        }
+                        if contents.contains("error ") {eprintln!("{contents}");stop_engine(&state);handle.exit(1);return;}
+                        std::thread::sleep(Duration::from_millis(500));
+                    }
+                    eprintln!("Native UI did not report readiness");stop_engine(&state);handle.exit(1);
+                });
+            }
             app.manage(state.clone());
             tauri::WebviewWindowBuilder::new(app,"main",tauri::WebviewUrl::App("index.html".into()))
                 .title("Voz Local").inner_size(1180.,820.).min_inner_size(800.,600.)

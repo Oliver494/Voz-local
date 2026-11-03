@@ -60,6 +60,16 @@ class LegacyImportTests(unittest.TestCase):
         self.assertEqual(before,(self.dest/'voz_local.sqlite3').read_bytes())
     def test_same_folder_rejected(self):
         with self.assertRaises(ValueError):legacy.import_data(self.source,self.source)
+    def test_interrupted_commit_recovers_on_next_start(self):
+        backup=self.dest/'.before-import-test';backup.mkdir()
+        (backup/'voz_local.sqlite3').write_bytes(b'previous')
+        (self.dest/'voz_local.sqlite3').write_bytes(b'new-incomplete')
+        (self.dest/'voices').mkdir();(self.dest/'voices/new.wav').write_bytes(b'new')
+        (self.dest/'import-journal.json').write_text(json.dumps({'backup':backup.name,'had_old':['voz_local.sqlite3','desktop-settings.json']}))
+        legacy.recover_import(self.dest)
+        self.assertEqual((self.dest/'voz_local.sqlite3').read_bytes(),b'previous')
+        self.assertFalse((self.dest/'voices').exists())
+        self.assertFalse((self.dest/'import-journal.json').exists())
     def test_failed_commit_restores_destination(self):
         old=self.dest/'voices';old.mkdir();(old/'keep.txt').write_text('retained')
         real=os.replace

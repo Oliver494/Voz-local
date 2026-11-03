@@ -76,5 +76,11 @@ jobs:
         run: |
           if ! gh release view v0.2.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create v0.2.0 --draft --prerelease --target "$GITHUB_SHA" --title 'Voz Local Desktop v0.2.0 — Preview' --notes-file docs/desktop-release.md
+          else
+            if [ "$(gh release view v0.2.0 --json isDraft --jq .isDraft)" != true ]; then
+              echo 'v0.2.0 is already published; bump the desktop version instead of replacing published assets.' >&2
+              exit 1
+            fi
+            gh release edit v0.2.0 --target "$GITHUB_SHA" --notes-file docs/desktop-release.md
           fi
           find installers -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' \) -print0 | xargs -0 -r gh release upload v0.2.0 --clobber
