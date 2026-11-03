@@ -41,7 +41,7 @@ jobs:
         run: python scripts/desktop/prepare_resources.py --platform ${{ matrix.platform }}
       - run: node scripts/build-frontend.mjs
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-      - run: python -m pip install fastapi==0.141.1 httpx==0.28.1 python-multipart==0.0.32 soundfile numpy
+      - run: python -m pip install fastapi==0.141.1 uvicorn==0.54.0 httpx==0.28.1 python-multipart==0.0.32 soundfile numpy
       - run: python -m unittest discover -s tests -v
         env:
           VOZ_LOCAL_FFMPEG: ${{ github.workspace }}/src-tauri/resources/tools/ffmpeg${{ runner.os == 'Windows' && '.exe' || '' }}
@@ -69,7 +69,7 @@ jobs:
           $handle = $process.Handle
           if (-not $process.WaitForExit(150000)) { Stop-Process -Id $process.Id -Force; throw 'Native UI smoke timed out' }
           Get-Content "$stdout", "$stderr"
-          Get-Content (Join-Path $data 'logs/desktop.log') -ErrorAction SilentlyContinue
+          Get-ChildItem (Join-Path $data 'logs/*.log') | ForEach-Object { Write-Output $_.Name; Get-Content $_.FullName }
           if ($process.ExitCode -ne 0) { throw "Native UI smoke failed: $($process.ExitCode)" }
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows' && always()
