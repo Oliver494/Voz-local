@@ -50,6 +50,36 @@ jobs:
           NO_STRIP: 'true'
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: npm run desktop:build -- --bundles ${{ matrix.bundles }}
+      - name: Windows native UI, private engine and media smoke
+        if: runner.os == 'Windows'
+        id: native-smoke
+        continue-on-error: true
+        timeout-minutes: 4
+        shell: pwsh
+        run: |
+          $data = Join-Path $env:LOCALAPPDATA 'com.oliver494.vozlocal'
+          python scripts/desktop/create_smoke_fixture.py --data "$data"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated native fixture' }
+          python -m venv --system-site-packages (Join-Path $data 'environment')
+          Copy-Item src-tauri/resources src-tauri/target/release/resources -Recurse -Force
+          New-Item -ItemType Directory -Force .build-deps | Out-Null
+          $stdout = Join-Path $PWD '.build-deps/native-windows.log'
+          $stderr = Join-Path $PWD '.build-deps/native-windows-errors.log'
+          $process = Start-Process -FilePath (Join-Path $PWD 'src-tauri/target/release/voz-local.exe') -ArgumentList '--smoke-media' -PassThru -RedirectStandardOutput "$stdout" -RedirectStandardError "$stderr"
+          $handle = $process.Handle
+          if (-not $process.WaitForExit(150000)) { Stop-Process -Id $process.Id -Force; throw 'Native UI smoke timed out' }
+          Get-Content "$stdout", "$stderr"
+          Get-Content (Join-Path $data 'logs/desktop.log') -ErrorAction SilentlyContinue
+          if ($process.ExitCode -ne 0) { throw "Native UI smoke failed: $($process.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && always()
+        with:
+          name: windows-native-smoke-logs
+          path: .build-deps/native-windows*.log
+      - name: Record native smoke status
+        if: runner.os == 'Windows' && always()
+        shell: bash
+        run: echo 'Windows native UI/media smoke — ${{ steps.native-smoke.outcome }}' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: voz-local-${{ matrix.platform }}
