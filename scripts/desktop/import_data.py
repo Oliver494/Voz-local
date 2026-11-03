@@ -7,6 +7,18 @@ import shutil
 import sqlite3
 import uuid
 
+from contextlib import contextmanager
+
+@contextmanager
+def closed_connection(*args, **kwargs):
+    db = sqlite3.connect(*args, **kwargs)
+    try:
+        with db:
+            yield db
+    finally:
+        db.close()
+
+
 
 def import_data(source, destination):
     source, destination = Path(source).resolve(), Path(destination).resolve()
@@ -14,14 +26,14 @@ def import_data(source, destination):
         raise ValueError('Choose a separate source data folder / Elige una carpeta de origen diferente.')
     database = destination / 'voz_local.sqlite3'
     if database.exists():
-        with sqlite3.connect(database) as db:
+        with closed_connection(database) as db:
             if db.execute('select count(*) from voices').fetchone()[0] or db.execute('select count(*) from projects').fetchone()[0]:
                 raise ValueError('Import requires an empty desktop library / La biblioteca de destino debe estar vacía.')
     stage = destination / ('.import-' + uuid.uuid4().hex)
     stage.mkdir(parents=True)
     try:
         uri = (source / 'voz_local.sqlite3').as_uri() + '?mode=ro'
-        with sqlite3.connect(uri, uri=True) as original, sqlite3.connect(stage / 'voz_local.sqlite3') as copied:
+        with closed_connection(uri, uri=True) as original, closed_connection(stage / 'voz_local.sqlite3') as copied:
             original.backup(copied)
             if copied.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise ValueError('Database is damaged / Base de datos dañada.')

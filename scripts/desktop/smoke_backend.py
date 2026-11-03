@@ -16,6 +16,18 @@ import urllib.request
 import uuid
 import wave
 
+from contextlib import contextmanager
+
+@contextmanager
+def closed_connection(*args, **kwargs):
+    db = sqlite3.connect(*args, **kwargs)
+    try:
+        with db:
+            yield db
+    finally:
+        db.close()
+
+
 
 def main():
     parser=argparse.ArgumentParser()
@@ -25,7 +37,7 @@ def main():
     parser.add_argument('--model',choices=['1.7B','0.6B'],default='1.7B')
     args=parser.parse_args()
     source=Path(args.legacy_data).resolve();output=Path(args.output).resolve();output.mkdir(parents=True,exist_ok=True)
-    with sqlite3.connect((source/'voz_local.sqlite3').as_uri()+'?mode=ro',uri=True) as db:
+    with closed_connection((source/'voz_local.sqlite3').as_uri()+'?mode=ro',uri=True) as db:
         db.row_factory=sqlite3.Row
         voice=db.execute('SELECT * FROM voices WHERE name=?',(args.voice_name,)).fetchone()
         if voice is None:raise ValueError('Requested voice profile does not exist')
@@ -40,7 +52,7 @@ def main():
         # Initialize only the isolated test DB, not the source library.
         subprocess.run([sys.executable,'-c','from app.storage import initialize; initialize()'],cwd=root,env=env,check=True)
         sample=data/'voices'/f"{voice['id']}.wav";shutil.copy2(original,sample)
-        with sqlite3.connect(data/'voz_local.sqlite3') as db:
+        with closed_connection(data/'voz_local.sqlite3') as db:
             db.execute('INSERT INTO voices(id,name,transcript,sample_path,duration) VALUES (?,?,?,?,?)',(voice['id'],'Private smoke sample',voice['transcript'],str(sample.relative_to(data)),voice['duration']))
         logs=open(output/'engine.log','w')
         kwargs={'start_new_session':True} if os.name!='nt' else {'creationflags':subprocess.CREATE_NEW_PROCESS_GROUP}
