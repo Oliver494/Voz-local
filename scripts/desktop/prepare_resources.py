@@ -73,6 +73,8 @@ def main():
     shutil.copy2(ROOT / 'THIRD_PARTY_NOTICES.md', notices)
     shutil.copy2(Path(__file__).with_name('tools.lock.json'), notices)
     backend = target / 'backend'
+    # Never ship bytecode caches or obsolete files left by local smoke tests.
+    if backend.exists(): shutil.rmtree(backend)
     for folder in ('app','static','scripts/desktop'):
         destination = backend / folder
         destination.mkdir(parents=True, exist_ok=True)

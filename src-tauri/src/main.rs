@@ -87,6 +87,7 @@ fn runtime_env(state: &Desktop, command: &mut Command) {
         .env("UV_NO_PROGRESS", "1")
         .env("VOZ_LOCAL_DATA_DIR", &state.root)
         .env("PYTHONUNBUFFERED", "1")
+        .env("PYTHONDONTWRITEBYTECODE", "1")
         .env("VOZ_LOCAL_PARENT_PID", std::process::id().to_string())
         .env("TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL", "1");
     let ffmpeg = std::env::var_os("VOZ_LOCAL_FFMPEG")
