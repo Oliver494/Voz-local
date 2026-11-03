@@ -29,6 +29,7 @@ class VoiceEngine:
         self.model = None
         self.active_size: str | None = None
         self.preferred_size = "1.7B"
+        self.phase = "idle"
         self.prompt_cache: dict[tuple[str, str, str], object] = {}
 
     def _release_locked(self) -> None:
@@ -47,6 +48,7 @@ class VoiceEngine:
         if self.model is not None and self.active_size == size:
             return
         self._release_locked()
+        self.phase = "loading"
         import torch
         from huggingface_hub import snapshot_download
         from qwen_tts import Qwen3TTSModel
@@ -54,8 +56,10 @@ class VoiceEngine:
         model_id = MODEL_IDS[size]
         local_path = model_path(size)
         if not (local_path / "model.safetensors").is_file():
+            self.phase = "downloading"
             LOG.info("Descargando %s en %s", model_id, local_path)
             snapshot_download(repo_id=model_id, local_dir=local_path)
+        self.phase = "loading"
         runtime = runtime_info()
         LOG.info("Cargando %s en %s (%s)", model_id, runtime['device'], runtime['dtype'])
         self.model = Qwen3TTSModel.from_pretrained(
@@ -96,9 +100,12 @@ class VoiceEngine:
                     raise ModelError(
                         "Tampoco pudo iniciarse el modelo 0.6B. Libera memoria de GPU y vuelve a intentarlo."
                     ) from fallback_error
+            finally:
+                self.phase = "idle"
 
     def _generate_locked(self, size: str, voice_id: str, reference: Path, transcript: str, text: str, settings: VoiceSettings):
         self._load_locked(size)
+        self.phase = "generating"
         # Qwen defaults to a simulated streaming text layout and allows up to
         # 4096 generated tokens. On ROCm that can keep short phrases running
         # for several minutes when the model does not emit EOS promptly.

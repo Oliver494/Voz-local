@@ -134,6 +134,11 @@ def status():
     }
 
 
+@app.get("/api/desktop/progress")
+def desktop_progress():
+    return {"phase": engine.phase}
+
+
 @app.get("/api/voices")
 def list_voices():
     return storage.all_rows(
