@@ -18,11 +18,15 @@ impl Process {
     pub fn new(child: Child) -> Result<Self, String> {
         #[cfg(windows)]
         unsafe {
+            let mut child = child;
             use windows_sys::Win32::Foundation::CloseHandle;
             use windows_sys::Win32::System::JobObjects::*;
             let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
             if job.is_null() {
-                return Err(std::io::Error::last_os_error().to_string());
+                let error = std::io::Error::last_os_error().to_string();
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
             }
             let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
             limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -34,8 +38,11 @@ impl Process {
             ) == 0
                 || AssignProcessToJobObject(job, child.as_raw_handle() as _) == 0
             {
+                let error = std::io::Error::last_os_error().to_string();
                 CloseHandle(job);
-                return Err(std::io::Error::last_os_error().to_string());
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
             }
             return Ok(Self {
                 child,
