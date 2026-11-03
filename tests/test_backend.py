@@ -73,4 +73,35 @@ class DesktopApiTests(unittest.TestCase):
             self.assertEqual(exported.status_code,200,exported.text)
         self.assertTrue(self.client.get(f"/api/projects/{project['id']}").is_success)
 
+    def test_fragment_order_and_independent_regeneration(self):
+        import numpy as np
+        import soundfile as sf
+        identifier='d'*32
+        voice=self.root/'voices'/f'{identifier}.wav'
+        sf.write(voice,np.zeros(24000,dtype=np.float32),24000)
+        with self.storage.connection() as db:
+            db.execute('INSERT OR IGNORE INTO voices(id,name,transcript,sample_path,duration) VALUES (?,?,?,?,?)',(identifier,'Order test','Hello','voices/'+voice.name,1.0))
+        script=('First part with several spoken words. '*12)+('Second part with different spoken words. '*12)
+        response=self.client.post('/api/projects',json={'title':'Ordered parts','voice_id':identifier,'script':script,'mode':'fragments'})
+        self.assertEqual(response.status_code,200,response.text)
+        project=response.json();chunks=project['chunks'];self.assertGreater(len(chunks),1)
+        values=[]
+        for index,chunk in enumerate(chunks):
+            value=(index+1)/100
+            values.append(value)
+            with patch.object(self.main.engine,'generate',return_value=(np.full(2400,value,dtype=np.float32),24000,'0.6B')):
+                generated=self.client.post(f"/api/projects/{project['id']}/chunks/{chunk['id']}/generate")
+                self.assertEqual(generated.status_code,200,generated.text)
+        preserved=self.client.get(f"/api/projects/{project['id']}").json()['chunks'][0]['audio_url']
+        first=self.client.get(preserved).content
+        with patch.object(self.main.engine,'generate',return_value=(np.full(2400,.25,dtype=np.float32),24000,'0.6B')):
+            self.assertEqual(self.client.post(f"/api/projects/{project['id']}/chunks/{chunks[1]['id']}/generate").status_code,200)
+        self.assertEqual(self.client.get(preserved).content,first)
+        values[1]=.25
+        result=self.client.post(f"/api/projects/{project['id']}/export?format=wav")
+        self.assertEqual(result.status_code,200,result.text)
+        audio,rate=sf.read(io.BytesIO(result.content))
+        self.assertEqual(len(audio),len(chunks)*2400)
+        for index,value in enumerate(values):self.assertAlmostEqual(float(np.mean(audio[index*2400:(index+1)*2400])),value,places=3)
+
 if __name__=='__main__':unittest.main()

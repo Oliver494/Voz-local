@@ -93,10 +93,10 @@ succeed. Packages are unsigned. No automatic updater is enabled in this preview.
 | Scenario | Current evidence |
 | --- | --- |
 | Rust/Tauri Linux compilation | `cargo check` succeeds on this Ubuntu host |
-| Python API regression | 12 tests: session auth, web compatibility, invalid audio, generation failure preservation, WAV/MP3 export, Range playback, legacy import rollback/path validation and external model reuse |
+| Python API regression | 13 tests: session auth, web compatibility, invalid audio, generation failure preservation, WAV/MP3 export, Range playback, legacy import rollback/path validation and external model reuse |
 | Native Rust guards | Test suite covers API path restrictions and active-operation accounting |
 | Windows/Linux installers | GitHub Actions builds each on its own OS; build results are recorded in the draft release |
-| Real GPU voice generation | Run `scripts/desktop/smoke_backend.py` with an explicitly selected legacy sample; results must be recorded separately from synthetic regression tests |
+| Real GPU voice generation | Tested with 1.7B on this Linux AMD/ROCm host: 5.36-second original WAV, WAV/MP3 exports, authenticated sidecar and HTTP Range; sample file unchanged. Generation took 55.66 seconds including model load. Perceived voice quality still requires listening. |
 | Actual microphone, perceived voice quality, clean-machine installation, crash recovery on every GPU | Requires manual validation; a successful package build does not establish these |
 
 Before publishing a stable release, install on clean Windows/Linux machines, test

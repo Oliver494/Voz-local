@@ -2,6 +2,8 @@
 (() => {
   if (!window.__TAURI__) return;
   const invoke = window.__TAURI__.core.invoke;
+  window.addEventListener('error',event=>invoke('ui_report',{kind:'error',message:String(event.message)}).catch(()=>{}));
+  window.addEventListener('unhandledrejection',event=>invoke('ui_report',{kind:'error',message:String(event.reason)}).catch(()=>{}));
   const es = () => localStorage.getItem('voz-local-language') === 'es';
   const text = (en, spanish) => es() ? spanish : en;
   const $ = id => document.getElementById(id);
@@ -134,6 +136,7 @@
   bridge.localize();
   window.__TAURI__.event.listen('desktop-progress',event=>progress(event.payload)).catch(fail);
   refresh().then(result=>{
+    invoke('ui_report',{kind:'ready',message:'Desktop interface loaded and IPC connected'}).catch(()=>{});
     $('dt-profile').value=result.installed?result.settings.profile:result.recommended_profile;
     $('dt-model').value=result.installed?result.settings.model:result.recommended_profile==='cpu'?'0.6B':'1.7B';
     $('dt-model-folder-path').textContent=result.settings.models_dir||'';

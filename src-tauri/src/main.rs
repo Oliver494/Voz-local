@@ -696,9 +696,31 @@ async fn open_data(app: tauri::AppHandle, state: State<'_>) -> Result<(), String
         .map_err(error)
 }
 #[tauri::command]
+async fn ui_report(state: State<'_>, kind: String, message: String) -> Result<(), String> {
+    if !["ready", "error"].contains(&kind.as_str()) {
+        return Err("Invalid UI report".into());
+    }
+    let mut log = File::options()
+        .create(true)
+        .append(true)
+        .open(state.root.join("logs/desktop.log"))
+        .map_err(error)?;
+    writeln!(
+        log,
+        "{} {}",
+        kind,
+        message
+            .chars()
+            .take(2000)
+            .collect::<String>()
+            .replace('\n', " ")
+    )
+    .map_err(error)
+}
+#[tauri::command]
 async fn diagnostics(state: State<'_>) -> Result<String, String> {
     let mut text = String::new();
-    for name in ["setup.log", "engine.log"] {
+    for name in ["setup.log", "engine.log", "desktop.log"] {
         if let Ok(mut file) = File::open(state.root.join("logs").join(name)) {
             let len = file.metadata().map_err(error)?.len();
             file.seek(SeekFrom::Start(len.saturating_sub(16000)))

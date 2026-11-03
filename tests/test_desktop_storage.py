@@ -66,7 +66,7 @@ class ModelLocationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);external=root/'old-models';data=root/'new-data';data.mkdir()
             model=external/'Qwen3-TTS-12Hz-1.7B-Base'
-            for filename in ('model.safetensors','config.json','speech_tokenizer/model.safetensors','speech_tokenizer/config.json'):
+            for filename in ('model.safetensors','config.json','generation_config.json','preprocessor_config.json','tokenizer_config.json','vocab.json','merges.txt','speech_tokenizer/model.safetensors','speech_tokenizer/config.json'):
                 file=model/filename;file.parent.mkdir(parents=True,exist_ok=True);file.write_text('x')
             with patch.dict(os.environ,{'VOZ_LOCAL_DATA_DIR':str(data),'VOZ_LOCAL_MODELS_DIR':str(external)}):
                 from app import storage

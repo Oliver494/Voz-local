@@ -24,7 +24,7 @@ def model_path(size: str) -> Path:
     name = f"Qwen3-TTS-12Hz-{size}-Base"
     if EXTERNAL_MODELS:
         external = Path(EXTERNAL_MODELS).expanduser().resolve() / name
-        required = ("model.safetensors", "config.json", "speech_tokenizer/model.safetensors", "speech_tokenizer/config.json")
+        required = ("model.safetensors", "config.json", "generation_config.json", "preprocessor_config.json", "tokenizer_config.json", "vocab.json", "merges.txt", "speech_tokenizer/model.safetensors", "speech_tokenizer/config.json")
         if all((external / file).is_file() for file in required):
             return external
     return MODELS / name
