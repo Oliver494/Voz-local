@@ -18,7 +18,7 @@ resumed on retry; completed dependencies are retained.
 
 The assistant does not bypass operating system prompts. Windows NSIS downloads
 WebView2 if needed and runs Microsoft's Visual C++ runtime installer, which may ask
-for elevation or a restart. Linux packages need WebKitGTK 4.1, GTK 3 and ALSA.
+for elevation or a restart. Linux packages need WebKitGTK 4.1, GTK 3, ALSA and the declared GStreamer audio plugins.
 Linux compatibility is initially targeted at Ubuntu 24.04/26.04 x64. Windows ARM,
 macOS and acceleration on other AMD GPUs are not advertised as supported.
 
@@ -51,7 +51,7 @@ previous audio. A crashed engine can be restarted from the assistant.
 - A random per-session bearer token is sent through stdin and retained by Rust;
   it is not in URLs, frontend JavaScript, CLI arguments or access logs.
 - JavaScript calls limited desktop commands. Rust forwards authenticated JSON and
-  multipart requests. Audio uses the `voz-media` scheme with bounded Range reads;
+  multipart requests. Windows audio uses the `voz-media` scheme. Linux uses a Rust loopback-only, read-only streaming gateway with random per-session media capabilities because WebKitGTK rejects custom-scheme media. The engine bearer token never enters those URLs. Both support Range reads;
   exported files stream to disk without base64 IPC.
 - Web mode still uses its existing HTTP API and browser microphone/exports.
 - Application data uses Tauri's local data directory (`com.oliver494.vozlocal`),
@@ -94,7 +94,7 @@ succeed. Packages are unsigned. No automatic updater is enabled in this preview.
 | --- | --- |
 | Rust/Tauri Linux compilation | `cargo check` succeeds on this Ubuntu host |
 | Python API regression | 15 Python tests (one Linux-only): session auth, web compatibility, invalid audio, generation failure preservation, WAV/MP3 export, Range playback, legacy import rollback/path validation and external model reuse |
-| Native full-flow Linux smoke | A real Tauri window reported UI → IPC → authenticated Python → SQLite → UI readiness; unauthenticated access returned 401 and the owned backend stopped when the app exited. Uses the existing interpreter as a read-only test reference, not a fresh installer validation. |
+| Native full-flow Linux smoke | A real Tauri window reported UI → IPC → authenticated Python → SQLite → UI readiness; the audio element loaded WAV metadata and seeked through the private media gateway. Unauthenticated engine access returned 401 and the owned backend stopped when the app exited. Uses the existing interpreter as a read-only test reference, not a fresh installer validation. |
 | Fresh private runtime and offline reuse | Linux: bundled uv downloaded Python 3.12.16 into an isolated directory, installed CPU PyTorch/dependencies, reused complete 0.6B weights, passed an actual tensor operation, then completed setup offline without reinstalling. Real CPU generation/export produced 9.68 seconds of audio (53.84 seconds including load on this host). |
 | Native Rust guards | Test suite covers API path restrictions and active-operation accounting |
 | Windows/Linux installers | GitHub Actions builds each on its own OS; build results are recorded in the draft release |
@@ -113,3 +113,13 @@ terminal. Puedes reutilizar modelos descargados e importar una biblioteca anteri
 sin modificarla. No se instalan controladores de GPU. Si falla la comprobación de
 PyTorch, elige CPU. Los paquetes son preliminares y sin firma; una compilación
 correcta no garantiza todavía todas las tarjetas, micrófonos ni equipos.
+
+### Linux playback compatibility
+
+A native media smoke test initially returned `MEDIA_ERR_SRC_NOT_SUPPORTED` (code 4)
+with custom URI schemes. This matches the [reported WebKitGTK limitation](https://github.com/block/buzz/issues/2562).
+The Linux gateway streams audio in Rust on a free `127.0.0.1` port. Its unpredictable
+URL is a read-only media capability; it cannot list projects, mutate the library or
+control the engine. The full bearer token remains private to Rust. HTTP Range and
+native metadata/seeking were verified with a synthetic WAV without playing sound.
+The gateway closes with the app. Loopback API requests bypass environment proxies.

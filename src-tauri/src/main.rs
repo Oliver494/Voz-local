@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod gateway;
 mod process;
 mod recording;
 use serde::{Deserialize, Serialize};
@@ -53,6 +54,7 @@ struct Desktop {
     settings: Mutex<Settings>,
     preparing: AtomicBool,
     busy: AtomicUsize,
+    media_origin: Mutex<String>,
     closing: AtomicBool,
 }
 type State<'a> = tauri::State<'a, Arc<Desktop>>;
@@ -300,7 +302,7 @@ async fn desktop_info(state: State<'_>) -> Result<Value, String> {
             "installed":state.root.join("desktop-ready.json").is_file() && state.root.join("environment-ready.json").is_file() && python(&state.root).is_file(),
             "running":state.engine.lock().unwrap().is_some(),"settings":*state.settings.lock().unwrap(),
             "progress":*state.progress.lock().unwrap(),"busy":state.busy.load(Ordering::SeqCst)>0,
-            "media_origin":if cfg!(windows){"http://voz-media.localhost"}else{"voz-media://localhost"}}))
+            "smoke_media":std::env::args().any(|a|a=="--smoke-media"),"media_origin":state.media_origin.lock().unwrap().clone()}))
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -823,6 +825,13 @@ fn media(
             .map_err(error)
     })();
     result.unwrap_or_else(|e| {
+        if let Ok(mut log) = File::options()
+            .create(true)
+            .append(true)
+            .open(state.root.join("logs/desktop.log"))
+        {
+            let _ = writeln!(log, "error media: {e}");
+        }
         tauri::http::Response::builder()
             .status(503)
             .body(e.into_bytes())
@@ -845,14 +854,15 @@ fn main() {
             for entry in fs::read_dir(root.join("tmp/recordings"))?.flatten(){let path=entry.path();if path.extension().and_then(|e|e.to_str())==Some("wav"){let _=fs::remove_file(path);}}
             let resources=if cfg!(debug_assertions){PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")}else{app.path().resource_dir()?.join("resources")};
             let settings=fs::read(root.join("desktop-settings.json")).ok().and_then(|s|serde_json::from_slice(&s).ok()).unwrap_or_default();
-            let state=Arc::new(Desktop{root,resources,settings:Mutex::new(settings),client:reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(15)).build()?,engine:Mutex::new(None),setup_process:Mutex::new(None),progress:Mutex::new(json!({"phase":"idle"})),samples:Mutex::new(HashMap::new()),recording:Mutex::new(None),preparing:AtomicBool::new(false),busy:AtomicUsize::new(0),closing:AtomicBool::new(false)});
-            let smoke_engine=std::env::args().any(|arg|arg=="--smoke-engine");
+            let state=Arc::new(Desktop{root,resources,settings:Mutex::new(settings),client:reqwest::blocking::Client::builder().no_proxy().connect_timeout(Duration::from_secs(15)).build()?,engine:Mutex::new(None),setup_process:Mutex::new(None),progress:Mutex::new(json!({"phase":"idle"})),samples:Mutex::new(HashMap::new()),recording:Mutex::new(None),preparing:AtomicBool::new(false),busy:AtomicUsize::new(0),media_origin:Mutex::new(String::new()),closing:AtomicBool::new(false)});
+            let smoke_media=std::env::args().any(|arg|arg=="--smoke-media");
+            let smoke_engine=smoke_media || std::env::args().any(|arg|arg=="--smoke-engine");
             if smoke_engine || std::env::args().any(|arg|arg=="--smoke-startup") {
                 let handle=app.handle().clone();let state=state.clone();let log=state.root.join("logs/desktop.log");
                 std::thread::spawn(move|| {
                     for _ in 0..240 {
                         let contents=fs::read_to_string(&log).unwrap_or_default();
-                        let expected=if smoke_engine{"ready Desktop project UI loaded from authenticated engine"}else{"ready Desktop interface loaded and IPC connected"};
+                        let expected=if smoke_media{"ready Desktop media protocol decoded WAV and seeked"}else if smoke_engine{"ready Desktop project UI loaded from authenticated engine"}else{"ready Desktop interface loaded and IPC connected"};
                         if contents.contains(expected) {
                             if smoke_engine {
                                 let base=state.engine.lock().unwrap().as_ref().map(|e|e.base.clone());
@@ -872,6 +882,7 @@ fn main() {
                     eprintln!("Native UI did not report readiness");stop_engine(&state);handle.exit(1);
                 });
             }
+            gateway::start(state.clone())?;
             app.manage(state.clone());
             tauri::WebviewWindowBuilder::new(app,"main",tauri::WebviewUrl::App("index.html".into()))
                 .title("Voz Local").inner_size(1180.,820.).min_inner_size(800.,600.)
@@ -916,6 +927,7 @@ mod tests {
             settings: Mutex::new(Settings::default()),
             preparing: AtomicBool::new(false),
             busy: AtomicUsize::new(0),
+            media_origin: Mutex::new(String::new()),
             closing: AtomicBool::new(false),
         };
         for path in [
@@ -944,6 +956,7 @@ mod tests {
             settings: Mutex::new(Settings::default()),
             preparing: AtomicBool::new(false),
             busy: AtomicUsize::new(0),
+            media_origin: Mutex::new(String::new()),
             closing: AtomicBool::new(false),
         });
         {

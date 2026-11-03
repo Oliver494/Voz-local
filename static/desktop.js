@@ -126,7 +126,28 @@
       finally{stopped=true;if(timer){clearInterval(timer);if(node)node.textContent=previous;}}
     } catch(error) { throw new Error(typeof error==='string'?error:error.message||String(error)); }
   };
-  bridge.appReady=()=>invoke('ui_report',{kind:'ready',message:'Desktop project UI loaded from authenticated engine'});
+  bridge.appError=error=>invoke('ui_report',{kind:'error',message:String(error.message||error)}).catch(()=>{});
+  bridge.appReady=async()=>{
+    await invoke('ui_report',{kind:'ready',message:'Desktop project UI loaded from authenticated engine'});
+    if(!info.smoke_media)return;
+    const player=document.querySelector('#chunk-list audio');
+    if(!player)throw new Error('Native media smoke requires an existing project audio');
+    player.muted=true;
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error('Native audio metadata timed out')),10000);
+      player.onloadedmetadata=()=>{clearTimeout(timer);resolve();};
+      player.onerror=()=>{clearTimeout(timer);reject(new Error('Native audio protocol error: '+(player.error?.message||player.error?.code)));};
+      player.preload='metadata';player.load();
+    });
+    await invoke('ui_report',{kind:'ready',message:'Native media metadata loaded'});
+    if(!Number.isFinite(player.duration)||player.duration<=0)throw new Error('Invalid native audio duration');
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error('Native seeking timed out')),10000);
+      player.onseeked=()=>{clearTimeout(timer);resolve();};
+      player.currentTime=Math.min(.25,player.duration/2);
+    });
+    await invoke('ui_report',{kind:'ready',message:'Desktop media protocol decoded WAV and seeked'});
+  };
   bridge.media=path=>info ? info.media_origin+path : path;
   bridge.export=async(project,format)=>{try{return await invoke('export_audio',{projectId:project.id,format,title:project.title});}catch(e){throw new Error(String(e));}};
   bridge.record=async(state,t,message)=> {

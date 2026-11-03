@@ -815,7 +815,7 @@ async function boot() {
     await Promise.all([loadStatus(), loadVoices(), loadProjects(), loadOllamaModels()]);
     if (state.projects.length) await openProject(state.projects[0].id);
     await window.VozDesktop?.appReady?.();
-  } catch (error) { message(t("startupError", { error: error.message }), true); }
+  } catch (error) { await window.VozDesktop?.appError?.(error); message(t("startupError", { error: error.message }), true); }
 }
 $ ("language-select").addEventListener("change", () => {
   state.language = $("language-select").value === "es" ? "es" : "en";
