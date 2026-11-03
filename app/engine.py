@@ -6,7 +6,7 @@ import threading
 
 import httpx
 
-from .storage import MODELS
+from .storage import model_path
 from .voice_settings import VoiceSettings
 from .runtime import runtime_info
 
@@ -52,7 +52,7 @@ class VoiceEngine:
         from qwen_tts import Qwen3TTSModel
 
         model_id = MODEL_IDS[size]
-        local_path = MODELS / model_id.rsplit("/", 1)[1]
+        local_path = model_path(size)
         if not (local_path / "model.safetensors").is_file():
             LOG.info("Descargando %s en %s", model_id, local_path)
             snapshot_download(repo_id=model_id, local_dir=local_path)

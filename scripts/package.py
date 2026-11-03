@@ -4,13 +4,14 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 root = Path(__file__).resolve().parent.parent
 files = [root / name for name in (
-    'README.md', 'INSTALACION.md', 'requirements.txt',
+    'README.md', 'INSTALACION.md', 'requirements.txt', 'THIRD_PARTY_NOTICES.md',
     'Instalar e iniciar.bat', 'Instalar e iniciar.command',
     'instalar-e-iniciar.sh', 'iniciar.sh', 'instalar.sh', '.gitignore')]
 files += list((root / 'app').glob('*.py'))
 files += list((root / 'scripts').glob('*.py'))
 files += list((root / 'scripts').glob('*.ps1'))
-files += [root / 'static' / name for name in ('index.html', 'styles.css', 'app.js')]
+files += [root / 'static' / name for name in ('index.html', 'styles.css', 'app.js', 'desktop.js')]
+files += list((root / 'docs').glob('*.md'))
 output = root / 'dist' / 'Voz-Local.zip'
 output.parent.mkdir(exist_ok=True)
 temporary = output.with_suffix('.zip.tmp')

@@ -1,0 +1,1 @@
+{"name":"voz-local-desktop","version":"0.2.0","private":true,"scripts":{"desktop:assets":"python3 scripts/desktop/prepare_resources.py","desktop:frontend":"node scripts/build-frontend.mjs","desktop:dev":"tauri dev","desktop:build":"tauri build"},"devDependencies":{"@tauri-apps/cli":"^2.10.0"}}

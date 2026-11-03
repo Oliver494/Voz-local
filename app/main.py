@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import uuid
+import secrets
 from typing import Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
@@ -31,6 +32,9 @@ app.mount("/static", StaticFiles(directory=storage.ROOT / "static"), name="stati
 
 @app.middleware("http")
 async def check_origin(request: Request, call_next):
+    desktop_token = os.environ.get("VOZ_LOCAL_SESSION_TOKEN")
+    if desktop_token and not secrets.compare_digest(request.headers.get("authorization", ""), f"Bearer {desktop_token}"):
+        return JSONResponse({"detail": "Unauthorized desktop session."}, status_code=401)
     if request.method in {"POST", "PATCH", "PUT", "DELETE"}:
         origin = request.headers.get("origin")
         if origin and origin not in {"http://127.0.0.1:8765", "http://localhost:8765"}:
@@ -106,8 +110,9 @@ def status():
     except Exception as error:
         gpu_names, gpu_available = [], False
         runtime = {'backend': 'Unavailable', 'device': None, 'error': str(error)}
-    voice_model_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
-    voice_model_dir = storage.MODELS / "Qwen3-TTS-12Hz-1.7B-Base"
+    default_size = os.environ.get("VOZ_LOCAL_DEFAULT_MODEL", "1.7B")
+    voice_model_id = f"Qwen/Qwen3-TTS-12Hz-{default_size}-Base"
+    voice_model_dir = storage.model_path(default_size)
     voice_model_installed = all(
         (voice_model_dir / filename).is_file()
         for filename in ("model.safetensors", "speech_tokenizer/model.safetensors")
@@ -117,6 +122,7 @@ def status():
         "gpus": gpu_names,
         "runtime": runtime,
         "target_model": engine.preferred_size,
+        "default_model": default_size,
         "active_model": engine.active_size,
         "model_downloaded": voice_model_installed,
         "voice_model": {

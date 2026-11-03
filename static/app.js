@@ -142,7 +142,8 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
   $("quick-steps").setAttribute("aria-label", t("howItWorks"));
-  $("install-tabs").setAttribute("aria-label", t("operatingSystem"));
+  $("install-tabs")?.setAttribute("aria-label", t("operatingSystem"));
+  window.VozDesktop?.localize?.();
   showView(); updateCount(); updateSettingLabels();
   if (state.project) renderProject();
 }
@@ -201,6 +202,7 @@ function message(text, error = false) {
 }
 
 async function api(path, options = {}) {
+  if (window.VozDesktop?.active) return window.VozDesktop.request(path, options);
   const response = await fetch(path, options);
   if (!response.ok) {
     let detail = `Error ${response.status}`;
@@ -225,8 +227,12 @@ async function loadStatus() {
     gpu.classList.toggle("bad", !status.gpu_available && status.runtime?.device !== "cpu");
     const installed = status.voice_model?.installed ?? status.model_downloaded;
     const activeSize = status.voice_model?.active_size;
-    const modelName = activeSize === "0.6B" ? "Qwen3-TTS 0.6B Base" : "Qwen3-TTS 1.7B Base";
+    const modelName = (activeSize || status.default_model) === "0.6B" ? "Qwen3-TTS 0.6B Base" : "Qwen3-TTS 1.7B Base";
     $("voice-model-name").textContent = modelName;
+    if (window.VozDesktop?.active && !window.VozDesktop.defaultApplied) {
+      $("project-voice-model").value = status.default_model === "0.6B" ? "qwen-0.6b" : "qwen-1.7b";
+      window.VozDesktop.defaultApplied = true;
+    }
     $("voice-model-description").textContent = activeSize === "0.6B"
       ? t("modelFallback")
       : t("modelDescription");
@@ -266,7 +272,7 @@ async function loadVoices() {
     const player = make("audio");
     player.controls = true;
     player.preload = "none";
-    player.src = `/api/voices/${voice.id}/audio`;
+    player.src = window.VozDesktop?.media(`/api/voices/${voice.id}/audio`) || `/api/voices/${voice.id}/audio`;
     card.append(player);
     const warning = make("p", "voice-warning");
     const updateWarning = () => {
@@ -445,7 +451,7 @@ function renderProject() {
       const player = make("audio");
       player.controls = true;
       player.preload = "none";
-      player.src = chunk.audio_url;
+      player.src = window.VozDesktop?.media(chunk.audio_url) || chunk.audio_url;
       const variant = make("div", "audio-variant");
       variant.append(make("span", "", chunk.raw_audio_url ? t("qwenOriginal") : t("oldAudio")), player);
       actions.append(variant);
@@ -634,6 +640,10 @@ async function exportAudio(format) {
   if (!state.project || state.busy) return;
   state.busy = true;
   try {
+    if (window.VozDesktop?.active) {
+      await window.VozDesktop.export(state.project, format);
+      return;
+    }
     const response = await fetch(`/api/projects/${state.project.id}/export?format=${format}`, { method: "POST" });
     if (!response.ok) {
       let detail = t("exportError");
@@ -694,6 +704,7 @@ async function rewrite() {
 function updateCount() { $("char-count").textContent = `${$("script-text").value.length} ${state.language === "en" ? "characters" : "caracteres"}`; }
 
 async function startRecording() {
+  if (window.VozDesktop?.active) return window.VozDesktop.record(state, t, message);
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     message(t("browserNoRecord"), true); return;
   }
@@ -729,16 +740,17 @@ async function startRecording() {
 async function saveVoice(event) {
   event.preventDefault();
   const file = state.recordedFile || $("voice-file").files[0];
-  if (!file) { message(t("recordOrSelect"), true); return; }
+  if (!file && !window.VozDesktop?.sample) { message(t("recordOrSelect"), true); return; }
   const button = $("save-voice-button");
   button.disabled = true;
   try {
     const body = new FormData();
     body.append("name", $("voice-name").value);
     body.append("transcript", $("voice-transcript").value);
-    body.append("file", file);
+    if (file) body.append("file", file);
     const voice = await api("/api/voices", { method: "POST", body });
     state.recordedFile = null;
+    if (window.VozDesktop?.active) window.VozDesktop.sample = null;
     $("voice-file").value = "";
     $("record-preview").hidden = true;
     $("record-timer").textContent = "";
@@ -798,6 +810,7 @@ $("voice-settings").querySelectorAll("input[id^='setting-'], select[id^='setting
 
 async function boot() {
   applyLanguage();
+  if (window.VozDesktop?.active) await window.VozDesktop.ready;
   try {
     await Promise.all([loadStatus(), loadVoices(), loadProjects(), loadOllamaModels()]);
     if (state.projects.length) await openProject(state.projects[0].id);
@@ -813,3 +826,7 @@ $ ("language-select").addEventListener("change", () => {
   loadOllamaModels().catch(() => {});
 });
 boot();
+document.addEventListener('desktop-engine-ready', () => {
+  if (!window.VozDesktop?.active) return;
+  Promise.all([loadStatus(), loadVoices(), loadProjects(), loadOllamaModels()]).catch(error => message(error.message, true));
+});

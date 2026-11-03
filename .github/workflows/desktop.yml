@@ -1,0 +1,77 @@
+name: Desktop preview
+on:
+  push:
+    branches: [desktop-app]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            bundles: deb,appimage
+          - os: windows-latest
+            platform: windows
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Linux build libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libasound2-dev librsvg2-dev patchelf libfuse2t64
+      - run: npm ci
+      - name: Prepare pinned bundled resources
+        run: python scripts/desktop/prepare_resources.py --platform ${{ matrix.platform }}
+      - run: node scripts/build-frontend.mjs
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - run: python -m pip install fastapi==0.141.1 httpx==0.28.1 python-multipart==0.0.32 soundfile numpy
+      - run: python -m unittest discover -s tests -v
+        env:
+          VOZ_LOCAL_FFMPEG: ${{ github.workspace }}/src-tauri/resources/tools/ffmpeg${{ runner.os == 'Windows' && '.exe' || '' }}
+      - name: Create desktop installers
+        env:
+          NO_STRIP: 'true'
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: npm run desktop:build -- --bundles ${{ matrix.bundles }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voz-local-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+  draft-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Create or update draft preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if ! gh release view v0.2.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create v0.2.0 --draft --prerelease --target "$GITHUB_SHA" --title 'Voz Local Desktop v0.2.0 — Preview' --notes-file docs/desktop-release.md
+          fi
+          find installers -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' \) -print0 | xargs -0 -r gh release upload v0.2.0 --clobber

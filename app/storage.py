@@ -1,22 +1,43 @@
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
+import os
+import json
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
+DATA = Path(os.environ.get("VOZ_LOCAL_DATA_DIR", ROOT / "data")).expanduser().resolve()
 VOICES = DATA / "voices"
 PROJECTS = DATA / "projects"
 EXPORTS = DATA / "exports"
 TMP = DATA / "tmp"
+_settings_file = DATA / "desktop-settings.json"
+try:
+    _desktop_settings = json.loads(_settings_file.read_text())
+except (OSError, ValueError):
+    _desktop_settings = {}
 MODELS = DATA / "models"
+EXTERNAL_MODELS = os.environ.get("VOZ_LOCAL_MODELS_DIR") or _desktop_settings.get("models_dir")
+
+
+def model_path(size: str) -> Path:
+    name = f"Qwen3-TTS-12Hz-{size}-Base"
+    if EXTERNAL_MODELS:
+        external = Path(EXTERNAL_MODELS).expanduser().resolve() / name
+        required = ("model.safetensors", "config.json", "speech_tokenizer/model.safetensors", "speech_tokenizer/config.json")
+        if all((external / file).is_file() for file in required):
+            return external
+    return MODELS / name
+
 DB = DATA / "voz_local.sqlite3"
 
 
 def initialize() -> None:
-    for directory in (DATA, VOICES, PROJECTS, EXPORTS, TMP, MODELS):
+    for directory in (DATA, VOICES, PROJECTS, EXPORTS, TMP):
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         directory.chmod(0o700)
+    if not MODELS.is_dir():
+        MODELS.mkdir(parents=True, exist_ok=True)
     with connection() as db:
         db.executescript(
             """

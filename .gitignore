@@ -6,3 +6,9 @@ data/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+node_modules/
+desktop-dist/
+src-tauri/target/
+src-tauri/resources/
+src-tauri/gen/
+.build-deps/

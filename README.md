@@ -1,5 +1,11 @@
 # Voz Local
 
+## Desktop preview v0.2.0
+
+A Tauri 2 / Rust desktop application for Windows x64 and Linux x64 is available on the `desktop-app` branch. It reuses the existing web interface and Python voice engine, with a setup assistant, native recording/file dialogs, private backend and separate application data. Read [the desktop guide and verification matrix](docs/DESKTOP.md). Desktop installers are prepared as a draft prerelease; the web instructions below remain valid.
+
+**Español:** la versión de escritorio se prepara en la rama `desktop-app`, con instaladores `.exe`, `.deb` y AppImage. Consulta [la guía de escritorio](docs/DESKTOP.md) para instalación, importación y limitaciones.
+
 A local web app for voice cloning and video narration with **Qwen3-TTS**. Record or upload a voice sample, write your script, generate audio and export WAV or MP3.
 
 The interface supports **English and Spanish**. The server runs on your own computer at `http://127.0.0.1:8765`.

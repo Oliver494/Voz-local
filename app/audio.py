@@ -1,6 +1,9 @@
 from pathlib import Path
 import re
 import subprocess
+import os
+
+FFMPEG = os.environ.get("VOZ_LOCAL_FFMPEG", "ffmpeg")
 import wave
 import numpy as np
 
@@ -42,7 +45,7 @@ def split_script(script: str, target: int = 220, maximum: int = 350) -> list[str
 
 def normalize_reference(source: Path, destination: Path) -> float:
     command = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        FFMPEG, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-i", str(source), "-vn", "-ac", "1", "-ar", "24000",
         "-c:a", "pcm_s16le", str(destination),
     ]
@@ -71,7 +74,7 @@ def process_generated_audio(samples, sample_rate: int, speed: float, effects: bo
     if effects:
         filters.extend(("highpass=f=70", "acompressor=threshold=0.125:ratio=2:attack=12:release=100:makeup=1"))
     result = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "f32le",
+        [FFMPEG, "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "f32le",
          "-ar", str(sample_rate), "-ac", "1", "-i", "pipe:0", "-af", ",".join(filters),
          "-f", "f32le", "-ac", "1", "-ar", str(sample_rate), "pipe:1"],
         input=np.asarray(samples, dtype="<f4").tobytes(), capture_output=True, timeout=180,
@@ -104,7 +107,7 @@ def combine_wav(files: list[Path], destination: Path) -> None:
 
 def wav_to_mp3(source: Path, destination: Path) -> None:
     result = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        [FFMPEG, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
          "-i", str(source), "-codec:a", "libmp3lame", "-b:a", "192k", str(destination)],
         capture_output=True, text=True, timeout=180,
     )
