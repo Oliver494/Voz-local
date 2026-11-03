@@ -836,7 +836,7 @@ fn main() {
             let state=context.app_handle().state::<Arc<Desktop>>().inner().clone();
             std::thread::spawn(move||responder.respond(media(&state,request)));
         })
-        .invoke_handler(tauri::generate_handler![desktop_info,prepare_engine,restart_engine,api_request,choose_sample,upload_voice,recording_start,recording_stop,export_audio,model_size,choose_models,import_legacy,open_external,open_data,diagnostics])
+        .invoke_handler(tauri::generate_handler![desktop_info,prepare_engine,restart_engine,api_request,choose_sample,upload_voice,recording_start,recording_stop,export_audio,model_size,choose_models,import_legacy,open_external,open_data,diagnostics,ui_report])
         .setup(|app| {
             let root=app.path().app_local_data_dir()?;
             for folder in ["logs","tmp/recordings"] {fs::create_dir_all(root.join(folder))?;}

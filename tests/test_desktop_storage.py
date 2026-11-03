@@ -7,6 +7,17 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from contextlib import contextmanager
+
+@contextmanager
+def closed_connection(*args, **kwargs):
+    db = sqlite3.connect(*args, **kwargs)
+    try:
+        with db:
+            yield db
+    finally:
+        db.close()
+
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('legacy_import',ROOT/'scripts/desktop/import_data.py')
 legacy=importlib.util.module_from_spec(spec)
@@ -14,10 +25,10 @@ spec.loader.exec_module(legacy)
 
 class LegacyImportTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(); self.base=Path(self.temp.name)
+        self.temp=tempfile.TemporaryDirectory(); self.base=Path(self.temp.name).resolve()
         self.source=self.base/'old data'; self.dest=self.base/'new data'
         self.source.mkdir();self.dest.mkdir()
-        with sqlite3.connect(self.source/'voz_local.sqlite3') as db:
+        with closed_connection(self.source/'voz_local.sqlite3') as db:
             db.executescript('CREATE TABLE voices(id TEXT PRIMARY KEY,sample_path TEXT); CREATE TABLE projects(id TEXT PRIMARY KEY,voice_id TEXT REFERENCES voices(id)); CREATE TABLE chunks(id TEXT PRIMARY KEY,project_id TEXT REFERENCES projects(id),audio_path TEXT);')
             db.execute('INSERT INTO voices VALUES (?,?)',('a','voices/a.wav'))
             db.execute('INSERT INTO projects VALUES (?,?)',('b','a'))
@@ -39,7 +50,7 @@ class LegacyImportTests(unittest.TestCase):
         with self.assertRaises(ValueError):legacy.import_data(self.source,self.dest)
         self.assertFalse((self.dest/'voz_local.sqlite3').exists())
     def test_path_traversal_rejected(self):
-        with sqlite3.connect(self.source/'voz_local.sqlite3') as db:db.execute("UPDATE voices SET sample_path='../secret.wav'")
+        with closed_connection(self.source/'voz_local.sqlite3') as db:db.execute("UPDATE voices SET sample_path='../secret.wav'")
         with self.assertRaises(ValueError):legacy.import_data(self.source,self.dest)
         self.assertFalse((self.dest/'voz_local.sqlite3').exists())
     def test_nonempty_destination_preserved(self):
@@ -64,7 +75,7 @@ class ModelLocationTests(unittest.TestCase):
     def test_external_complete_models_are_reused_and_missing_models_stay_local(self):
         import importlib
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp);external=root/'old-models';data=root/'new-data';data.mkdir()
+            root=Path(temp).resolve();external=root/'old-models';data=root/'new-data';data.mkdir()
             model=external/'Qwen3-TTS-12Hz-1.7B-Base'
             for filename in ('model.safetensors','config.json','generation_config.json','preprocessor_config.json','tokenizer_config.json','vocab.json','merges.txt','speech_tokenizer/model.safetensors','speech_tokenizer/config.json'):
                 file=model/filename;file.parent.mkdir(parents=True,exist_ok=True);file.write_text('x')

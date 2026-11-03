@@ -3,6 +3,9 @@ on:
   push:
     branches: [desktop-app]
   workflow_dispatch:
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
